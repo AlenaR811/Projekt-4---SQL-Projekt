@@ -1,0 +1,126 @@
+CREATE TABLE t_Alena_Rusinova_project_SQL_primary_final AS
+	SELECT cp.value AS Prumerna_hruba_mzda_na_zamestnance_Kc, 
+			cp.payroll_year,
+			cp.payroll_quarter,
+			cpib.name AS jmeno_oboru
+		FROM czechia_payroll AS cp
+		JOIN czechia_payroll_industry_branch AS cpib
+			ON cp.industry_branch_code = cpib.code
+		JOIN czechia_payroll_value_type AS cpvt
+			ON cp.value_type_code = cpvt.code
+		WHERE cpvt.code = '5958' AND cp.unit_code = '200';
+
+-- 1.
+SELECT payroll_year, jmeno_oboru, SUM(Prumerna_hruba_mzda_na_zamestnance_Kc), 
+		LAG (SUM(Prumerna_hruba_mzda_na_zamestnance_Kc)) OVER (PARTITION BY jmeno_oboru ORDER BY payroll_year) AS Předchozí_rok,
+		CASE 
+			WHEN SUM(Prumerna_hruba_mzda_na_zamestnance_Kc) - LAG (SUM(Prumerna_hruba_mzda_na_zamestnance_Kc)) OVER (PARTITION BY jmeno_oboru ORDER BY payroll_year) > 0 THEN "Růst"
+			WHEN SUM(Prumerna_hruba_mzda_na_zamestnance_Kc) - LAG (SUM(Prumerna_hruba_mzda_na_zamestnance_Kc)) OVER (PARTITION BY jmeno_oboru ORDER BY payroll_year) < 0 THEN "Pokles"
+		END		
+FROM t_Alena_Rusinova_project_SQL_primary_final tarpspf
+GROUP BY jmeno_oboru, payroll_year;
+
+-- Administrativní a podpůrné činnosti:
+-- Pokles 2013, 2021
+-- Činnosti v oblasti nemovitostí:
+-- Pokles 2013, 2020, 2021
+-- Doprava a skladování:
+-- Pokles 2021
+-- Informační a komunikační činnost:
+-- Pokles 2013, 2021
+-- Kulturní, zábavní a rekreační činnost:
+-- Pokles 2011, 2013, 2021
+-- Ostatní činnosti:
+-- Pokles 2021
+-- Peněžnictví a pojišťovnictví:
+-- Pokles 2013, 2021
+-- Profesní, vědecké a technické činnosti:
+-- Pokles 2010, 2013, 2021
+-- Stavebnictví: 
+-- Pokles 2013, 2021
+-- Těžba a dobývání:
+-- Pokles 2009, 2013, 2014, 2016, 2021
+-- Ubytování, stravování a pohostinství:
+-- Pokles 2009, 2011, 2020, 2021 
+-- Velkoobchod a maloobchod, opravy a údržba motorových vozidel:
+-- Pokles 2013, 2021 
+-- Veřejná správa a obrana, povinné sociální zabezpečení:
+-- Pokles 2010, 2011, 2021
+-- Výroba a rozvod elektřiny, plynu, tepla a klimatiz. vzduchu:
+-- Pokles 2013, 2015, 2021 
+-- Vzdělávání:
+-- Pokles 2010, 2021
+-- Zásobování vodou; činnosti související s odpady a sanacemi:
+-- Pokles 2013, 2021
+-- Zdravotní a sociální péče:
+-- Pokles 2021
+-- Obor Zemědělství, lesnictví, rybářství:
+-- Pokles 2009, 2021 
+-- Zpracovatelský průmysl:
+-- Pokles 2021
+
+-- 2.
+SELECT cp.date_from, cpc.name, cpc.price_value, cpc.price_unit, 
+ROUND(AVG(cp.value),2) AS Prumerna_cena, 
+ROUND(AVG(AR.Prumerna_hruba_mzda_na_zamestnance_Kc),2) AS Prumerna_mzda,
+ROUND(AVG(AR.Prumerna_hruba_mzda_na_zamestnance_Kc)/AVG(cp.value),0) AS Pocet_jednotek_kg_l 
+FROM czechia_price AS cp
+JOIN czechia_price_category AS cpc
+ON cp.category_code = cpc.code
+JOIN t_Alena_Rusinova_project_SQL_primary_final AS AR
+ON AR.payroll_year = YEAR (cp.date_from) 
+WHERE cpc.code IN ('114201','111301') AND YEAR (cp.date_from) IN (2006,2018)  
+GROUP BY cpc.code, YEAR (cp.date_from);
+
+-- Chléb; 2006; 1287kg
+-- Chléb; 2018; 1342kg
+-- Mléko; 2006; 1437l
+-- Mléko; 2018; 1642l
+
+-- 3.
+SELECT cp.date_from, cpc.name, 
+	ROUND(AVG(cp.value),2) AS Prumerna_cena,
+	LAG (ROUND(AVG(cp.value),2)) OVER (PARTITION BY cpc.name ORDER BY cp.date_from) AS Předchozí_rok,
+	ROUND(((ROUND(AVG(cp.value),2)/LAG (ROUND(AVG(cp.value),2)) OVER (PARTITION BY cpc.name ORDER BY cp.date_from)) - 1),2) AS Vývoj_ceny
+FROM czechia_price AS cp
+JOIN czechia_price_category AS cpc
+ON cp.category_code = cpc.code
+GROUP BY cpc.name, YEAR (cp.date_from);
+
+-- Cukr krystalový
+
+-- 4.
+
+SELECT cp.date_from,  
+	ROUND(AVG(cp.value),2) AS Prumerna_cena,
+	LAG (ROUND(AVG(cp.value),2)) OVER (PARTITION BY cpc.name ORDER BY cp.date_from) AS Předchozí_rok,
+	ROUND(((ROUND(AVG(cp.value),2)/LAG (ROUND(AVG(cp.value),2)) OVER (PARTITION BY cpc.name ORDER BY cp.date_from)) - 1),2) AS Vývoj_ceny
+FROM czechia_price AS cp
+JOIN czechia_price_category AS cpc
+ON cp.category_code = cpc.code
+WHERE cpc.code != 212101
+GROUP BY YEAR (cp.date_from);
+
+SELECT payroll_year, ROUND(AVG(Prumerna_hruba_mzda_na_zamestnance_Kc),2) AS Průměrná_mzda, 
+		LAG (ROUND(AVG(Prumerna_hruba_mzda_na_zamestnance_Kc),2)) OVER (ORDER BY payroll_year) AS Předchozí_rok,
+		ROUND(((ROUND(AVG(Prumerna_hruba_mzda_na_zamestnance_Kc),2)/LAG (ROUND(AVG(Prumerna_hruba_mzda_na_zamestnance_Kc),2)) OVER (ORDER BY payroll_year)) - 1),2) AS Vývoj_mzdy
+FROM t_Alena_Rusinova_project_SQL_primary_final tarpspf
+GROUP BY payroll_year;
+
+-- 2012,2013 vyšší nárůst cen potravin než mzdy
+
+-- 5.
+CREATE TABLE t_Alena_Rusinova_project_SQL_secondary_final AS
+	SELECT country, year, GDP
+	FROM economies
+	WHERE country = "Czech Republic" AND GDP IS NOT NULL
+	ORDER BY year ASC;
+
+SELECT *,
+LAG (GDP) OVER (ORDER BY year) AS GDP_Predchozí_rok,
+ROUND((((GDP)/LAG (GDP) OVER (ORDER BY year)) - 1),2) AS Předchozí_rok
+FROM t_Alena_Rusinova_project_SQL_secondary_final;
+
+-- Ano, výška HDP má vliv na změny ve mzdách a cenách potravin. Změna HDP se projeví v následujícím období.
+
+-- Pro srovnání dat je potřeba pracovat s roky 2007 až 2018, jinde chybí data a v cenách potravin se nevyužije informace o ceně jakostního bílého vína, které bylo sledováno krátké období.
